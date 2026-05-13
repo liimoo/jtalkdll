@@ -37,6 +37,8 @@ OPEN_JTALK_C_START;
 #include <stdarg.h>
 #include <string.h>
 #include <math.h>
+/* NovelCraft patch: PortAudio を完全に切り離せるように include を条件化 */
+#ifndef JTALK_NO_PORTAUDIO
 #include <portaudio.h>
 
 #define AUDIO_PLAY_PORTAUDIO
@@ -49,6 +51,7 @@ OPEN_JTALK_C_START;
 #endif
 #endif
 #endif
+#endif /* JTALK_NO_PORTAUDIO */
 
 typedef struct Open_JTalk_tag
 {

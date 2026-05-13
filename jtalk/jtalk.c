@@ -49,6 +49,10 @@ JTALK_C_START;
 #pragma comment(lib, "shlwapi.lib")
 #endif
 
+/* NovelCraft patch: JTALK_NO_PORTAUDIO が定義されている場合、
+   PortAudio 依存を完全に外す。speak/speakSync/speakAsync 系の
+   音声再生 API は使えなくなるが、speakToFile 系のファイル出力は機能する。 */
+#ifndef JTALK_NO_PORTAUDIO
 #if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__MINGW32__)
 #ifdef WINDOWS_PORTAUDIO
 #include <portaudio.h>
@@ -59,6 +63,7 @@ JTALK_C_START;
 #else
 #include <portaudio.h>
 #endif
+#endif /* JTALK_NO_PORTAUDIO */
 
 #if defined(ICONV_ENABLE)
 #include <iconv.h>
@@ -109,10 +114,12 @@ typedef struct speakData_t
 	bool paused;
 	bool finished;
 	void (*onFinished)(void);
+#ifndef JTALK_NO_PORTAUDIO
 #if (!defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)) || defined(WINDOWS_PORTAUDIO)
 	PaStream *stream;
 #else
 #endif
+#endif /* JTALK_NO_PORTAUDIO */
 } SpeakData;
 
 // 主データ
@@ -3311,6 +3318,7 @@ check_charset:
 ** オーディオデータ出力関連関数
 */
 
+#ifndef JTALK_NO_PORTAUDIO
 #if (!defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)) || defined(WINDOWS_PORTAUDIO)
 void speak_sync(OpenJTalk *oj)
 {
@@ -3557,6 +3565,7 @@ exit_func:
 
 #else
 #endif
+#endif /* JTALK_NO_PORTAUDIO */
 
 bool generate_wavFile(OpenJTalk *oj, const char *txt, FILE *wavfp)
 {
@@ -5083,6 +5092,7 @@ OpenJTalk *openjtalk_initialize_sub(const char *voice, const char *dic, const ch
 	g_verbose = true;
 #endif
 
+#ifndef JTALK_NO_PORTAUDIO
 #if (!defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)) || defined(WINDOWS_PORTAUDIO)
 	if (Pa_Initialize() != paNoError)
 	{
@@ -5093,6 +5103,7 @@ OpenJTalk *openjtalk_initialize_sub(const char *voice, const char *dic, const ch
 		return NULL;
 	}
 #endif
+#endif /* JTALK_NO_PORTAUDIO */
 
 	OpenJTalk *oj = (OpenJTalk *)malloc(sizeof(OpenJTalk));
 	if (!oj)
@@ -5260,10 +5271,12 @@ OPENJTALK_DLL_API void OPENJTALK_CONVENTION openjtalk_clear(OpenJTalk *oj)
 		return;
 	}
 	openjtalk_stop(oj);
+#ifndef JTALK_NO_PORTAUDIO
 #if (!defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)) || defined(WINDOWS_PORTAUDIO)
 	Pa_Terminate();
 #else
 #endif
+#endif /* JTALK_NO_PORTAUDIO */
 	if (g_psd != NULL && g_psd->data)
 	{
 		free(g_psd->data);
@@ -5295,6 +5308,7 @@ OPENJTALK_DLL_API void OPENJTALK_CONVENTION openjtalk_refresh(OpenJTalk *oj)
 	}
 }
 
+#ifndef JTALK_NO_PORTAUDIO
 void speakasync(OpenJTalk *oj)
 {
 	g_psd->stop = false;
@@ -5388,6 +5402,7 @@ OPENJTALK_DLL_API void OPENJTALK_CONVENTION openjtalk_speakSyncU16(OpenJTalk *oj
 		speak_sync(oj);
 	}
 }
+#endif /* JTALK_NO_PORTAUDIO */
 
 OPENJTALK_DLL_API void OPENJTALK_CONVENTION openjtalk_stop(OpenJTalk *oj)
 {
@@ -5463,10 +5478,12 @@ OPENJTALK_DLL_API void OPENJTALK_CONVENTION openjtalk_resume(OpenJTalk *oj)
 		return;
 	}
 
+#ifndef JTALK_NO_PORTAUDIO
 	if (g_psd->length != 0)
 	{
 		speak_async(oj);
 	}
+#endif /* JTALK_NO_PORTAUDIO */
 }
 
 OPENJTALK_DLL_API void OPENJTALK_CONVENTION openjtalk_wait(OpenJTalk *oj, int duration)
@@ -6974,6 +6991,7 @@ OPENJTALK_DLL_API char16_t *OPENJTALK_CONVENTION openjtalk_getFullVoicePathU16(O
 	return res2;
 }
 
+#ifndef JTALK_NO_PORTAUDIO
 OPENJTALK_DLL_API void OPENJTALK_CONVENTION openjtalk_test(OpenJTalk *oj, void *text)
 {
 	if (!oj)
@@ -7022,6 +7040,7 @@ OPENJTALK_DLL_API void OPENJTALK_CONVENTION openjtalk_test(OpenJTalk *oj, void *
 	fprintf(stderr, u8"***** finished *****\n\n");
 	g_verbose = temp;
 }
+#endif /* JTALK_NO_PORTAUDIO */
 
 OPENJTALK_DLL_API void OPENJTALK_CONVENTION openjtalk_setVerbose(bool sw)
 {

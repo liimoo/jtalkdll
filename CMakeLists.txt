@@ -263,34 +263,45 @@ else()
 endif()
 
 
+### NovelCraft patch: JTALK_NO_PORTAUDIO オプション
+# ON にすると、PortAudio 依存（音声再生まわり）を完全に切り離してビルドする。
+# 用途: iOS / Android / 組み込みで PortAudio が動かないプラットフォーム向け。
+# このフラグが ON の時、jtalk.c 内の #ifdef JTALK_NO_PORTAUDIO で speak/speakAsync 系が無効化される。
+# speakToFile（ファイル書き出し）は影響なく動く。
+option(JTALK_NO_PORTAUDIO "Disable PortAudio dependency (for iOS / Android / embedded)" OFF)
+
 ### look for libportaudio
 set(EXIST_PORTAUDIO 0)
-if(UNIX AND NOT APPLE)
-    if(NOT mingw_build)
-        find_library(PORTAUDIO_LIBRARY NAMES portaudio)
-        if(PORTAUDIO_LIBRARY)
-            set(EXIST_PORTAUDIO 1)
+if(NOT JTALK_NO_PORTAUDIO)
+    if(UNIX AND NOT APPLE)
+        if(NOT mingw_build)
+            find_library(PORTAUDIO_LIBRARY NAMES portaudio)
+            if(PORTAUDIO_LIBRARY)
+                set(EXIST_PORTAUDIO 1)
+            endif()
         endif()
     endif()
-endif()
-if(mingw_build)
-    #find_library(PORTAUDIO_LIBRARY NAMES portaudio PATHS ${CMAKE_FIND_ROOT_PATH} ONLY_CMAKE_FIND_ROOT_PATH)
-    find_library(PORTAUDIO_LIBRARY NAMES portaudio ONLY_CMAKE_FIND_ROOT_PATH)
-    if(PORTAUDIO_LIBRARY)
-        set(EXIST_PORTAUDIO 1)
-    else()
-        message(FATAL_ERROR "libportaudio.a not found\nPlease run the script 'build_portaudio_mingw'.")
+    if(mingw_build)
+        #find_library(PORTAUDIO_LIBRARY NAMES portaudio PATHS ${CMAKE_FIND_ROOT_PATH} ONLY_CMAKE_FIND_ROOT_PATH)
+        find_library(PORTAUDIO_LIBRARY NAMES portaudio ONLY_CMAKE_FIND_ROOT_PATH)
+        if(PORTAUDIO_LIBRARY)
+            set(EXIST_PORTAUDIO 1)
+        else()
+            message(FATAL_ERROR "libportaudio.a not found\nPlease run the script 'build_portaudio_mingw'.")
+        endif()
     endif()
-endif()
-if(EXIST_PORTAUDIO)
-    message("-- Portaudio Library found: ${PORTAUDIO_LIBRARY}")
+    if(EXIST_PORTAUDIO)
+        message("-- Portaudio Library found: ${PORTAUDIO_LIBRARY}")
+    else()
+        message("-- Portaudio Library not found")
+    endif()
 else()
-    message("-- Portaudio Library not found")
+    message("-- JTALK_NO_PORTAUDIO=ON: PortAudio をスキップしてビルドします")
 endif()
 
 
 ### portaudio subdirectory
-if(NOT EXIST_PORTAUDIO)
+if(NOT JTALK_NO_PORTAUDIO AND NOT EXIST_PORTAUDIO)
     add_subdirectory(portaudio)
 endif()
 
@@ -530,6 +541,19 @@ add_library(HTSEngine STATIC
 set_target_properties(HTSEngine PROPERTIES COMPILE_FLAGS ${hts_c_compile_flags})
 
 
+# NovelCraft patch: iOS など実行ファイルを作れないプラットフォーム向けに
+# 「ライブラリのみビルド」モードを用意する。iOS では実行ファイルがバンドル扱いになり
+# 通常の install(TARGETS ... RUNTIME) では失敗するため、まとめてスキップする。
+# auto-detect: CMAKE_SYSTEM_NAME=iOS なら自動的にライブラリのみ
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
+    set(_jtalk_lib_only_default ON)
+else()
+    set(_jtalk_lib_only_default OFF)
+endif()
+option(JTALK_BUILD_LIB_ONLY "Skip executable targets (for iOS / Android)" ${_jtalk_lib_only_default})
+
+if(NOT JTALK_BUILD_LIB_ONLY)
+
 ### hts_engine
 add_executable(hts_engine ${HTS_ENGINE_API_PATH}/bin/hts_engine.c)
 target_link_libraries(hts_engine HTSEngine)
@@ -608,20 +632,28 @@ if(install_open_jtalk)
     install(TARGETS open_jtalk RUNTIME DESTINATION ${FOLDER_INSTALL_BIN})
 endif()
 
+endif() # NOT JTALK_BUILD_LIB_ONLY (executables)
+
 
 ### openjtalk
 include_directories(${OPEN_JTALK_PATH}/bin)
-include_directories(portaudio/include)
+if(NOT JTALK_NO_PORTAUDIO)
+    include_directories(portaudio/include)
+endif()
 add_library(openjtalk STATIC
     ${OPEN_JTALK_PATH}/bin/openjtalk.c
 )
 set_target_properties(openjtalk PROPERTIES COMPILE_FLAGS ${openjtalk_compile_flags})
-if(MSVC AND WIN32 OR APPLE)
-    set(PORTAUDIO portaudio_static)
-elseif(mingw_build)
-    set(PORTAUDIO ${PORTAUDIO_LIBRARY})
-else()
-    set(PORTAUDIO portaudio)
+
+# JTALK_NO_PORTAUDIO=ON の場合、PortAudio リンク自体をスキップする
+if(NOT JTALK_NO_PORTAUDIO)
+    if(MSVC AND WIN32 OR APPLE)
+        set(PORTAUDIO portaudio_static)
+    elseif(mingw_build)
+        set(PORTAUDIO ${PORTAUDIO_LIBRARY})
+    else()
+        set(PORTAUDIO portaudio)
+    endif()
 endif()
 target_link_libraries(openjtalk
     text2mecab
@@ -638,7 +670,7 @@ target_link_libraries(openjtalk
     HTSEngine
     ${PORTAUDIO}
 )
-if(mingw_build OR (MSVC AND WIN32) OR  CYGWIN)
+if(NOT JTALK_NO_PORTAUDIO AND (mingw_build OR (MSVC AND WIN32) OR  CYGWIN))
     target_link_libraries(openjtalk winmm)
 endif()
 
@@ -646,12 +678,26 @@ endif()
 ### main project
 ### jtalk
 include_directories(${JTALK_PATH})
-include_directories(portaudio/include)
-add_library(jtalk SHARED
-    ${JTALK_PATH}/jtalk.c
-    ${JTALK_PATH}/jtalk.def
-)
+if(NOT JTALK_NO_PORTAUDIO)
+    include_directories(portaudio/include)
+endif()
+# NovelCraft patch: iOS/Android では SHARED が使えない/不便なので STATIC を選ぶ
+if(JTALK_BUILD_LIB_ONLY)
+    add_library(jtalk STATIC
+        ${JTALK_PATH}/jtalk.c
+    )
+else()
+    add_library(jtalk SHARED
+        ${JTALK_PATH}/jtalk.c
+        ${JTALK_PATH}/jtalk.def
+    )
+endif()
 set_target_properties(jtalk PROPERTIES COMPILE_FLAGS ${jtalk_c_compile_flags})
+# JTALK_NO_PORTAUDIO=ON の場合、jtalk.c の PortAudio 依存ブロックを #ifndef で除外する
+if(JTALK_NO_PORTAUDIO)
+    target_compile_definitions(jtalk PRIVATE JTALK_NO_PORTAUDIO)
+    target_compile_definitions(openjtalk PRIVATE JTALK_NO_PORTAUDIO)
+endif()
 target_link_libraries(jtalk
     openjtalk
     mecab
@@ -768,6 +814,9 @@ if(build_jtalkcom AND MSVC AND WIN32)
 endif()
 
 
+# JTALK_NO_PORTAUDIO=ON では CLI (jsay / jtd_c) も PortAudio 経由の再生機能を持つためビルドしない
+if(NOT JTALK_NO_PORTAUDIO)
+
 ### c sample
 ### jsay
 add_executable(jsay
@@ -805,6 +854,12 @@ if(mingw_build)
 endif()
 install(TARGETS jtd_c RUNTIME DESTINATION ${FOLDER_INSTALL_BIN})
 
+endif() # NOT JTALK_NO_PORTAUDIO
+
+
+# NovelCraft patch: mecab-dict-index 実行ファイルをビルドしない構成（iOS/Android）では
+# 辞書のビルドターゲットもスキップする。辞書は Mac/Linux 等で事前ビルドしたものを使う前提。
+if(NOT JTALK_BUILD_LIB_ONLY)
 
 ### list of dictionary files
 set(copy_list char.bin;matrix.bin;sys.dic;unk.dic;left-id.def;right-id.def;rewrite.def;pos-id.def;COPYING)
@@ -848,3 +903,5 @@ install(FILES ${dic_files} DESTINATION ${DATA_INSTALL_PREFIX}/${FOLDER_INSTALL_D
 
 ### install voices
 install(DIRECTORY ${HTS_VOICE_PATH} DESTINATION ${DATA_INSTALL_PREFIX})
+
+endif() # NOT JTALK_BUILD_LIB_ONLY (dictionary)

@@ -126,6 +126,7 @@ typedef enum {
 	OPENJTALK_OS_WINDOWS,
 	OPENJTALK_OS_LINUX,
 	OPENJTALK_OS_OSX,
+	OPENJTALK_OS_IPHONE,    /* NovelCraft patch: iOS 対応 */
 } OPENJTALK_OS;
 
 typedef enum {
