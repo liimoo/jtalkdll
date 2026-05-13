@@ -681,8 +681,10 @@ include_directories(${JTALK_PATH})
 if(NOT JTALK_NO_PORTAUDIO)
     include_directories(portaudio/include)
 endif()
-# NovelCraft patch: iOS/Android では SHARED が使えない/不便なので STATIC を選ぶ
-if(JTALK_BUILD_LIB_ONLY)
+# NovelCraft patch: iOS は SHARED 不可（Apple ガイドラインで動的ライブラリ制約大）→ STATIC。
+# Android は SHARED .so がネイティブプラグインの標準なので SHARED。
+# その他 (macOS/Win/Linux) は SHARED。
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_library(jtalk STATIC
         ${JTALK_PATH}/jtalk.c
     )

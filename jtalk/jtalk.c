@@ -18,6 +18,9 @@ JTALK_C_START;
 #define WINDOWS_PORTAUDIO
 #elif defined(__MINGW32__)
 #include <comip.h>
+#elif defined(__ANDROID__)
+/* NovelCraft patch: Android NDK は iconv を持たない（独自実装または bionic 経由が必要）。
+   Shift_JIS 系変換 API は今回不要なので ICONV_ENABLE を立てずに iconv 依存を切る。 */
 #else
 #define ICONV_ENABLE
 #endif
@@ -756,6 +759,24 @@ char *u8tosjis_path(const char *in_str, char *dest)
 {
 	return (char *)convert_charset_path((char *)in_str, CS_UTF_8, (char *)dest, CS_SHIFT_JIS);
 }
+
+#elif defined(__ANDROID__)
+/* NovelCraft patch: Android NDK は iconv も Windows API も持たないため、
+   Shift_JIS / UTF-16 系変換 API は使用不可とし、null 返しのスタブにする。
+   NovelCraft 側では UTF-8 専用 API (openjtalk_initialize / openjtalk_speakToFile2 等) しか
+   呼ばないので、これらが呼ばれてもアプリ動作には影響しない。 */
+char *sjistou8(const char *in_str) { (void)in_str; return NULL; }
+char16_t *u8tou16(const char *in_str) { (void)in_str; return NULL; }
+char16_t *sjistou16(const char *in_str) { (void)in_str; return NULL; }
+char *u16tou8(const char16_t *in_str) { (void)in_str; return NULL; }
+char *u16tosjis(const char16_t *in_str) { (void)in_str; return NULL; }
+char *u8tosjis(const char *in_str) { (void)in_str; return NULL; }
+char16_t *u8tou16_path(const char *in_str, char16_t *dest) { (void)in_str; (void)dest; return NULL; }
+char16_t *sjistou16_path(const char *in_str, char16_t *dest) { (void)in_str; (void)dest; return NULL; }
+char *u16tou8_path(const char16_t *in_str, char *dest) { (void)in_str; (void)dest; return NULL; }
+char *sjistou8_path(const char *in_str, char *dest) { (void)in_str; (void)dest; return NULL; }
+char *u16tosjis_path(const char16_t *in_str, char *dest) { (void)in_str; (void)dest; return NULL; }
+char *u8tosjis_path(const char *in_str, char *dest) { (void)in_str; (void)dest; return NULL; }
 
 #else
 // Windows 専用
