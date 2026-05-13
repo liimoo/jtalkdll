@@ -47,15 +47,20 @@ set(FOLDER_INSTALL_VOICE voice)
 
 ### set mingw compiler
 if(MINGW)
-    set(target_arch "$ENV{MINGW_CHOST}")
-    set(mingw_prefix "$ENV{MINGW_PREFIX}")
-    set(CMAKE_FIND_ROOT_PATH "${mingw_prefix}")
-    set(CMAKE_C_COMPILER gcc)
-    set(CMAKE_CXX_COMPILER g++)
-    set(CMAKE_RANLIB gcc-ranlib)
-    set(CMAKE_AS as)
-    set(CMAKE_AR ar)
-    set(CMAKE_STRIP strip)
+    # NovelCraft patch: クロスコンパイル時（CMAKE_TOOLCHAIN_FILE 指定）には
+    # toolchain がコンパイラを既に設定済みなのでここで上書きしない。
+    # 上書きすると Mac の bare g++ が選ばれてしまい windows.h が見つからなくなる。
+    if(NOT CMAKE_TOOLCHAIN_FILE)
+        set(target_arch "$ENV{MINGW_CHOST}")
+        set(mingw_prefix "$ENV{MINGW_PREFIX}")
+        set(CMAKE_FIND_ROOT_PATH "${mingw_prefix}")
+        set(CMAKE_C_COMPILER gcc)
+        set(CMAKE_CXX_COMPILER g++)
+        set(CMAKE_RANLIB gcc-ranlib)
+        set(CMAKE_AS as)
+        set(CMAKE_AR ar)
+        set(CMAKE_STRIP strip)
+    endif()
     set(mingw_build 1)
 elseif(CYGWIN)
     if(NOT target_arch)
@@ -670,7 +675,9 @@ target_link_libraries(openjtalk
     HTSEngine
     ${PORTAUDIO}
 )
-if(NOT JTALK_NO_PORTAUDIO AND (mingw_build OR (MSVC AND WIN32) OR  CYGWIN))
+# NovelCraft patch: Windows ターゲットでは HTS_engine 内に waveOut* (winmm) 参照があるため、
+# JTALK_NO_PORTAUDIO の有無に関わらず winmm をリンクする。
+if(mingw_build OR (MSVC AND WIN32) OR CYGWIN)
     target_link_libraries(openjtalk winmm)
 endif()
 
@@ -684,8 +691,14 @@ endif()
 # NovelCraft patch: iOS は SHARED 不可（Apple ガイドラインで動的ライブラリ制約大）→ STATIC。
 # Android は SHARED .so がネイティブプラグインの標準なので SHARED。
 # その他 (macOS/Win/Linux) は SHARED。
+# また jtalk.def は speakSync/speakAsync 系を export する宣言を含むため、
+# JTALK_NO_PORTAUDIO 時は def を使わず __declspec(dllexport) / visibility attribute に任せる。
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_library(jtalk STATIC
+        ${JTALK_PATH}/jtalk.c
+    )
+elseif(JTALK_NO_PORTAUDIO)
+    add_library(jtalk SHARED
         ${JTALK_PATH}/jtalk.c
     )
 else()

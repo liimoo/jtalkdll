@@ -17,7 +17,12 @@ JTALK_C_START;
 //#define ICONV_ENABLE
 #define WINDOWS_PORTAUDIO
 #elif defined(__MINGW32__)
+/* NovelCraft patch: comip.h は COM interop 用の C++ 専用ヘッダだが、
+   .c ファイルに include されると C++ 標準ヘッダ <new> 等を巻き込んで失敗する。
+   我々の用途（PortAudio 抜きの static link）では不要なのでスキップする。 */
+#ifndef JTALK_NO_PORTAUDIO
 #include <comip.h>
+#endif
 #elif defined(__ANDROID__)
 /* NovelCraft patch: Android NDK は iconv を持たない（独自実装または bionic 経由が必要）。
    Shift_JIS 系変換 API は今回不要なので ICONV_ENABLE を立てずに iconv 依存を切る。 */
@@ -65,6 +70,12 @@ JTALK_C_START;
 #endif
 #else
 #include <portaudio.h>
+#endif
+#else /* JTALK_NO_PORTAUDIO */
+/* NO_PORTAUDIO 時、元々 portaudio.h 経由で transitive に入っていた
+   windows.h を Windows ターゲットに対して明示的に補う（DllMain 等で必要）。 */
+#if defined(_WIN32)
+#include <windows.h>
 #endif
 #endif /* JTALK_NO_PORTAUDIO */
 
