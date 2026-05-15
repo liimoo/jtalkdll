@@ -123,3 +123,17 @@ open_jtalk-1.10/lib/jtd_c
 ffi/cpp/jtd_cppqt.vcproj
 ffi/cpp/moc_predefs.h
 ffi/cpp/jtd_cpp
+
+# CMake out-of-source build directories from setup-openjtalk-*.sh
+# (NovelCraft_Client 親リポジトリの Scripts/setup-openjtalk-{mac,ios,android,windows}.sh
+#  で各プラットフォーム向けに生成される一時ビルドツリー。コミット対象ではない。)
+build_mac/
+build_mac_nopa/
+build_ios/
+build_ios_device/
+build_android_arm64/
+build_android_armv7/
+build_win_x64/
+
+# Windows MinGW build artifact placed by setup script
+jtalk/jtalk.dll
