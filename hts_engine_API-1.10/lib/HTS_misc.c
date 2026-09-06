@@ -248,7 +248,7 @@ size_t HTS_ftell(HTS_File * fp)
 #if defined(_WIN32) || defined(__CYGWIN__) || defined(__APPLE__) || defined(__ANDROID__)
       return (size_t) pos;
 #else
-      return (size_t) pos.__pos;
+      return (size_t) ftello((FILE *) fp->pointer);
 #endif                          /* _WIN32 || __CYGWIN__ || __APPLE__ || __ANDROID__ */
    } else if (fp->type == HTS_DATA) {
       HTS_Data *d = (HTS_Data *) fp->pointer;
